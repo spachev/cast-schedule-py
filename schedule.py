@@ -4,10 +4,11 @@ import pychromecast
 import json
 import urllib2,traceback
 from pychromecast.controllers.media import MediaController
-import getopt,sys
+import getopt,sys,time
 
 dev_name = None
 sched_url = None
+host = None
 retry_sleep = 3
 
 class Sched:
@@ -32,10 +33,23 @@ class Sched:
 					mc.update_status()
 
 				content_type = '*/*'
+
+				if 'url' not in u:
+					continue
+
+				url = u['url']
+
+				if 'contentType' in u:
+					content_type = u['contentType']
+
 				dur = int(u['duration'])
+
+				if 'resetCache' in u and int(u['resetCache']):
+					url = url + "?reset_cache=" + str(time.time())
+
 				if dur > 0:
-					mc.play_media(u['url'],content_type)
-					print("Playing media " + u['url'])
+					mc.play_media(url, content_type)
+					print("Playing media " + url + ', content_type=' + content_type)
 					time.sleep(dur)
 			try:
 				self.update_sched()
@@ -45,6 +59,7 @@ class Sched:
 def usage():
 	print('''
 Usage:
+ --host - IP address of the host, overrides --cast-name, use it if mDNS resolution is flaky
  --cast-name - Friendly name of the Chromecast
  --sched-url - URL to load the casting schedule from - should supply a JSON array like this:
      [
@@ -60,7 +75,7 @@ def usage_die(msg):
 	sys.exit(1)
 
 try:
-	opts,args = getopt.getopt(sys.argv[1:], '', ['sched-url=','cast-dev=', 'retry-sleep='])
+	opts,args = getopt.getopt(sys.argv[1:], '', ['sched-url=','cast-dev=', 'retry-sleep=', 'host='])
 	for o, a in opts:
 		if o == '--sched-url':
 			sched_url = a
@@ -68,6 +83,8 @@ try:
 			dev_name = a
 		elif o == '--retry-sleep':
 			retry_sleep = int(a)
+		elif o == '--host':
+			host = a
 		else:
 			usage_die("Invalid option " + o)
 except:
@@ -75,18 +92,23 @@ except:
 	usage()
 	sys.exit(1)
 
-if dev_name == None:
-	usage_die("Need --cast-dev")
+if dev_name == None and host == None:
+	usage_die("Need --cast-dev or --host")
 if sched_url == None:
 	usage_die("Need --sched-url")
 
-print("dev_name = " + dev_name + ", sched_url = " + sched_url)
+print("dev_name = " + str(dev_name) + ", sched_url = " + sched_url + ", host = " + str(host))
 sch = Sched(sched_url)
 
 while True:
 	while True:
-		print("Locating device " + dev_name)
-		cast = pychromecast.get_chromecast(friendly_name=dev_name)
+		print("Locating device dev_name=" + str(dev_name) + ", host = " + str(host))
+
+		if dev_name != None:
+			cast = pychromecast.get_chromecast(friendly_name=dev_name)
+		else:
+			cast = pychromecast.Chromecast(host)
+
 		if cast != None:
 			print(cast.device)
 			break
