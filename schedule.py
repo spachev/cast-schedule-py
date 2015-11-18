@@ -5,6 +5,9 @@ import json
 import urllib2,traceback
 from pychromecast.controllers.media import MediaController
 import getopt,sys,time
+import logging
+
+logging.basicConfig()
 
 dev_name = None
 sched_url = None
